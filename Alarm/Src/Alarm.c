@@ -26,12 +26,7 @@ void Alarm_status(){
 
 	static Alarm_state current_state = Alarm_init;
 	static TextLCDType lcd;
-	static uint8_t set_Temp;
-
-
-
-
-
+	static uint8_t set_Temp = 22;
 
 	switch(current_state){
 
@@ -150,6 +145,7 @@ Alarm_state A_idle(TextLCDType *lcd){
 		update_lcd(lcd,LCD_SetTemp);
 		return Alarm_SetTemp;
 	}
+
 
 	return Alarm_idle;
 }
@@ -326,6 +322,14 @@ Alarm_state A_setTemp(TextLCDType *lcd, uint8_t *setTemp){
 	button = keypad_read();
 	if(button != 99){
 		if(button == 0x0A){
+
+			*setTemp = tmp_set_Temp;
+			tmp_set_Temp = 0;
+			tmp_presses = 0;
+			lcd_clearRow(lcd,3);
+			HAL_Delay(50);
+		}
+		else if(button == 0x0B){
 			set_Led(L_GREEN);
 			TextLCD_Clear(lcd);
 			update_lcd(lcd,LCD_Unlocked);
@@ -333,6 +337,7 @@ Alarm_state A_setTemp(TextLCDType *lcd, uint8_t *setTemp){
 			tmp_set_Temp = 0;
 			tmp_presses = 0;
 			return Alarm_idle;
+
 		}
 		else{ //if(button <= 0x00 && 0x09 <= button){
 
@@ -345,6 +350,15 @@ Alarm_state A_setTemp(TextLCDType *lcd, uint8_t *setTemp){
 			HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
 		}
 	}
+	if(tmp_presses == 3){
+		tmp_set_Temp = 0;
+		tmp_presses = 0;
+		lcd_clearRow(lcd,3);
+		HAL_Delay(50);
+	}
+
+	lcd_clearRow(lcd,1);
+	TextLCD_Printf(lcd,"Set Temp:%d", *setTemp);
 
 	return Alarm_SetTemp;
 
@@ -427,7 +441,7 @@ void update_lcd(TextLCDType *lcd,LCD_Status tmpS){
 		case LCD_SetTemp:
 			TextLCD_Clear(lcd);
 			TextLCD_Printf(lcd,"A - SET  B - Return");
-			TextLCD_Position(lcd,0,1);
+			TextLCD_Position(lcd,20,0);
 			TextLCD_Printf(lcd,"Enter A New Temp");
 			break;
 	}
