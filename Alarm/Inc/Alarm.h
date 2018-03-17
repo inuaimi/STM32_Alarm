@@ -15,7 +15,7 @@
 typedef enum{Alarm_init, Alarm_idle, ALarm_arming,
 	Alarm_armed,Alarm_PRE_Trigged,Alarm_Trigged, Alarm_SetTemp,Alarm_SetGyro} Alarm_state;
 
-typedef enum{Key_No_Pressed, Key_Pressed,Key_OK,Key_Wrong, Key_A, Key_B} key_code;
+typedef enum{Key_No_Pressed, Key_Pressed,Key_OK,Key_Wrong, Key_A, Key_B,Key_C, Key_D} key_code;
 
 typedef enum{NONE, Motion_Trigged,Sound_Trigged,Diamond_Trigged} sensor_status;
 

@@ -96,6 +96,10 @@ key_code Alarm_code_status(const uint8_t *code){
 			return Key_A;
 		else if(button == 0x0B && clicks==0)
 			return Key_B;
+		else if(button == 0x0D && clicks !=0){
+			clicks--;
+			return Key_D;
+		}
 		clicked_button[clicks] = button;
 		clicks++;
 		if(clicks==4){
@@ -158,11 +162,18 @@ Alarm_state A_idle(TextLCDType *lcd,uint8_t setTemp){
 		tmp_presses = 0;
 		return Alarm_SetTemp;
 	}
+	else if(current_key_state == Key_D && tmp_presses !=0){
+		tmp_presses--;
+		TextLCD_Position(lcd,20+tmp_presses,1);
+		TextLCD_Putchar(lcd,' ');
+		TextLCD_Position(lcd,20+tmp_presses,1);
+	}
 	lcd_clearRow(lcd,1);
 	TextLCD_Printf(lcd,"Temp:%d SET:%d",currentTemp,setTemp);
 
 	return Alarm_idle;
 }
+
 Alarm_state A_arming(TextLCDType *lcd){
 
 	static uint8_t counter = 10;
@@ -189,6 +200,11 @@ Alarm_state A_arming(TextLCDType *lcd){
 		TextLCD_Position(lcd,20+tmp_presses,1);
 		TextLCD_Putchar(lcd,'*');
 		tmp_presses++;
+	}
+	else if(current_key_state == Key_D && tmp_presses != 0){
+		tmp_presses--;
+		TextLCD_Position(lcd,20+tmp_presses,1);
+		TextLCD_Putchar(lcd,' ');
 	}
 	else if(current_key_state == Key_Wrong){
 		TextLCD_Position(lcd,20,0);
@@ -218,12 +234,14 @@ Alarm_state A_arming(TextLCDType *lcd){
 
 
 }
+
 Alarm_state A_armed(TextLCDType *lcd,uint8_t setTemp){
 
 
 	key_code current_key_state;
 	uint8_t sensorStatus;
 	const uint8_t Pin[4] = {7,3,9,2};
+	static uint8_t tmp_presses = 0;
 
 	sensorStatus = check_sensors(setTemp);
 
@@ -239,30 +257,38 @@ Alarm_state A_armed(TextLCDType *lcd,uint8_t setTemp){
 			set_Led(L_GREEN);
 			TextLCD_Clear(lcd);
 			update_lcd(lcd,LCD_Unlocked);
+			tmp_presses = 0;
 			return Alarm_idle;
 		}
-	else if(current_key_state == Key_Pressed)
+	else if(current_key_state == Key_Pressed){
+		TextLCD_Position(lcd,20+tmp_presses,1);
 		TextLCD_Putchar(lcd,'*');
+		tmp_presses++;
+
+	}
 	else if(current_key_state == Key_Wrong){
 		lcd_clearRow(lcd,2);
 		TextLCD_Puts(lcd,"Wrong Pin, Try Again");
 		lcd_clearRow(lcd,3);
+		tmp_presses = 0;
 	}
-
-
-
+	else if(current_key_state == Key_D && tmp_presses != 0){
+		tmp_presses--;
+		TextLCD_Position(lcd,20+tmp_presses,1);
+		TextLCD_Putchar(lcd,' ');
+	}
 
 	return Alarm_armed;
 
 
 
 }
+
 Alarm_state A_Pre_Trigged(TextLCDType *lcd){
 
 
 	static uint8_t counter = 30;
 	static uint32_t last_sTick = 0;
-	//uint32_t current_sTick = sTick;
 	key_code current_key_state;
 
 
@@ -275,6 +301,7 @@ Alarm_state A_Pre_Trigged(TextLCDType *lcd){
 	if(current_key_state == Key_OK){
 		set_Led(L_GREEN);
 		update_lcd(lcd,LCD_Unlocked);
+		counter = 30;
 		return Alarm_idle;
 		}
 	else if(current_key_state == Key_Pressed){
@@ -287,6 +314,11 @@ Alarm_state A_Pre_Trigged(TextLCDType *lcd){
 		TextLCD_Printf(lcd,"Wrong Pin, Try again");
 		lcd_clearRow(lcd,3);
 		tmp_presses = 0;
+	}
+	else if(current_key_state == Key_D && tmp_presses !=0){
+		tmp_presses--;
+		TextLCD_Position(lcd, 20+tmp_presses,1);
+		TextLCD_Putchar(lcd,' ');
 	}
 
 
@@ -332,6 +364,11 @@ Alarm_state A_Trigged(TextLCDType *lcd){
 		lcd_clearRow(lcd,3);
 		tmp_presses = 0;
 	}
+	else if(current_key_state == Key_D){
+		tmp_presses--;
+		TextLCD_Position(lcd,20+tmp_presses,1);
+		TextLCD_Putchar(lcd, ' ');
+	}
 	return Alarm_Trigged;
 
 }
@@ -368,7 +405,7 @@ Alarm_state A_setTemp(TextLCDType *lcd, uint8_t *setTemp){
 			TextLCD_Position(lcd,20,1);
 			TextLCD_Printf(lcd,"%d ",tmp_set_Temp);
 			tmp_presses++;
-			HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
+
 		}
 	}
 	if(tmp_presses == 3){
@@ -411,7 +448,6 @@ void set_Led(Led_Color ld){
 
 	}
 }
-
 
 void update_lcd(TextLCDType *lcd,LCD_Status tmpS){
 
@@ -467,6 +503,7 @@ void update_lcd(TextLCDType *lcd,LCD_Status tmpS){
 			break;
 	}
 }
+
 void lcd_clearRow(TextLCDType *lcd,uint8_t row){
 
 	uint8_t x=0, y = row % 2;
@@ -480,6 +517,7 @@ void lcd_clearRow(TextLCDType *lcd,uint8_t row){
 	TextLCD_Position(lcd,x,y);
 
 }
+
 uint8_t check_sensors(uint8_t setTemp){
 
 	int16_t temp = Read_Analog_Temp();
