@@ -524,8 +524,6 @@ int16_t Read_Analog_Temp(){
 
 	Temp = (1.0f/(Temp_1 + Temp_2)) - 273.15;
 
-
-
 	return Temp;
 
 
