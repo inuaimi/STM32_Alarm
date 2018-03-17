@@ -10,7 +10,7 @@
 #include "stm32f4xx_hal.h"
 #include "LCD.h"
 
-
+#define RS 10000.0f
 
 typedef enum{Alarm_init, Alarm_idle, ALarm_arming,
 	Alarm_armed,Alarm_PRE_Trigged,Alarm_Trigged, Alarm_SetTemp,Alarm_SetGyro} Alarm_state;
@@ -25,9 +25,9 @@ typedef enum{LCD_NONE, LCD_Unlocked, LCD_Locked,LCD_Arming,LCD_PRI_Trigged,LCD_T
 
 
 void Alarm_status();
-Alarm_state A_idle(TextLCDType *lcd);
+Alarm_state A_idle(TextLCDType *lcd,uint8_t setTemp);
 Alarm_state A_arming(TextLCDType *lcd);
-Alarm_state A_armed(TextLCDType *lcd);
+Alarm_state A_armed(TextLCDType *lcd,uint8_t setTemp);
 
 Alarm_state A_Pre_Trigged(TextLCDType *lcd);
 Alarm_state A_Trigged(TextLCDType *lcd);
@@ -37,7 +37,9 @@ Alarm_state A_setTemp(TextLCDType *lcd, uint8_t *setTemp);
 key_code Alarm_code_status(const uint8_t *code);
 
 void lcd_clearRow(TextLCDType *lcd,uint8_t row);
+uint8_t check_sensors(uint8_t setTemp);
 
+int16_t Read_Analog_Temp();
 
 
 

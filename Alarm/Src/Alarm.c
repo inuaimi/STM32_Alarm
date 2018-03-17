@@ -13,6 +13,7 @@
 /* External variables --------------------------------------------------------*/
 extern TIM_HandleTypeDef htim10;
 extern TIM_HandleTypeDef htim11;
+extern ADC_HandleTypeDef hadc1;
 extern volatile uint32_t usTick, sTick;
 
 sensor_status sensor_event = NONE;
@@ -26,7 +27,7 @@ void Alarm_status(){
 
 	static Alarm_state current_state = Alarm_init;
 	static TextLCDType lcd;
-	static uint8_t set_Temp = 22;
+	static uint8_t set_Temp = 26;
 
 	switch(current_state){
 
@@ -36,7 +37,7 @@ void Alarm_status(){
 			update_lcd(&lcd,LCD_Unlocked);
 			break;
 		case Alarm_idle:
-			current_state = A_idle(&lcd);
+			current_state = A_idle(&lcd,set_Temp);
 			HAL_Delay(150);
 			break;
 		case ALarm_arming:
@@ -45,7 +46,7 @@ void Alarm_status(){
 			break;
 
 		case Alarm_armed:
-			current_state = A_armed(&lcd);
+			current_state = A_armed(&lcd, set_Temp);
 		  	HAL_Delay(150);
 			break;
 
@@ -119,33 +120,46 @@ key_code Alarm_code_status(const uint8_t *code){
 
 
 
-Alarm_state A_idle(TextLCDType *lcd){
+Alarm_state A_idle(TextLCDType *lcd,uint8_t setTemp){
 
 	key_code current_key_state;
+	int16_t currentTemp;
+	static uint8_t tmp_presses = 0;
+
 
 	const uint8_t Pin[4] = {7,3,9,2};
 
 
+
+	currentTemp = Read_Analog_Temp();
 	current_key_state = Alarm_code_status(Pin);
 	if(current_key_state == Key_OK){
 		set_Led(L_YELLOW);
 		update_lcd(lcd,LCD_Arming);
+		tmp_presses = 0;
 		return ALarm_arming;
 
 	}
-	else if(current_key_state == Key_Pressed)
+	else if(current_key_state == Key_Pressed){
+		TextLCD_Position(lcd,20+tmp_presses,1);
 		TextLCD_Putchar(lcd,'*');
+		tmp_presses ++;
+
+	}
 	else if(current_key_state == Key_Wrong){
 		lcd_clearRow(lcd,2);
 		TextLCD_Printf(lcd,"Wrong Pin,Try Again");
 		lcd_clearRow(lcd,3);
+		tmp_presses = 0;
 	}
 
 	else if(current_key_state == Key_A){
 		update_lcd(lcd,LCD_SetTemp);
+		tmp_presses = 0;
 		return Alarm_SetTemp;
 	}
-
+	lcd_clearRow(lcd,1);
+	TextLCD_Printf(lcd,"Temp:%d SET:%d",currentTemp,setTemp);
 
 	return Alarm_idle;
 }
@@ -172,13 +186,14 @@ Alarm_state A_arming(TextLCDType *lcd){
 		return Alarm_idle;
 		}
 	else if(current_key_state == Key_Pressed){
-		TextLCD_Position(lcd,20+tmp_presses,0);
+		TextLCD_Position(lcd,20+tmp_presses,1);
 		TextLCD_Putchar(lcd,'*');
 		tmp_presses++;
 	}
 	else if(current_key_state == Key_Wrong){
 		TextLCD_Position(lcd,20,0);
-		TextLCD_Printf(lcd,"    ");
+		TextLCD_Printf(lcd,"Wrong Pin, Try again");
+		lcd_clearRow(lcd,3);
 		tmp_presses = 0;
 	}
 
@@ -192,7 +207,7 @@ Alarm_state A_arming(TextLCDType *lcd){
 		return Alarm_armed;
 	}
 	else if(last_sTick != current_sTick){
-		TextLCD_Position(lcd,0,0);
+		lcd_clearRow(lcd,0);
 		TextLCD_Printf(lcd,"Arming:%d ", counter);
 		counter--;
 		last_sTick = current_sTick;
@@ -203,13 +218,22 @@ Alarm_state A_arming(TextLCDType *lcd){
 
 
 }
-Alarm_state A_armed(TextLCDType *lcd){
+Alarm_state A_armed(TextLCDType *lcd,uint8_t setTemp){
 
 
 	key_code current_key_state;
+	uint8_t sensorStatus;
 	const uint8_t Pin[4] = {7,3,9,2};
 
+	sensorStatus = check_sensors(setTemp);
+
+	if(sensorStatus){
+		update_lcd(lcd,LCD_PRI_Trigged);
+		return Alarm_PRE_Trigged;
+	}
+
 	current_key_state = Alarm_code_status(Pin);
+
 
 	if(current_key_state == Key_OK){
 			set_Led(L_GREEN);
@@ -220,18 +244,13 @@ Alarm_state A_armed(TextLCDType *lcd){
 	else if(current_key_state == Key_Pressed)
 		TextLCD_Putchar(lcd,'*');
 	else if(current_key_state == Key_Wrong){
-		TextLCD_Position(lcd, 20,0);
+		lcd_clearRow(lcd,2);
 		TextLCD_Puts(lcd,"Wrong Pin, Try Again");
-		TextLCD_Position(lcd, 20,1);
-		TextLCD_Puts(lcd, "    ");
-		TextLCD_Position(lcd, 20,1);
+		lcd_clearRow(lcd,3);
 	}
 
 
-	if(sensor_event == Motion_Trigged){
-		update_lcd(lcd,LCD_PRI_Trigged);
-		return Alarm_PRE_Trigged;
-	}
+
 
 	return Alarm_armed;
 
@@ -246,6 +265,7 @@ Alarm_state A_Pre_Trigged(TextLCDType *lcd){
 	//uint32_t current_sTick = sTick;
 	key_code current_key_state;
 
+
 	static uint8_t tmp_presses = 0;
 
 	const uint8_t Pin[4] = {7,3,9,2};
@@ -258,13 +278,14 @@ Alarm_state A_Pre_Trigged(TextLCDType *lcd){
 		return Alarm_idle;
 		}
 	else if(current_key_state == Key_Pressed){
-		TextLCD_Position(lcd,20+tmp_presses,0);
+		TextLCD_Position(lcd,20+tmp_presses,1);
 		TextLCD_Putchar(lcd,'*');
 		tmp_presses++;
 	}
 	else if(current_key_state == Key_Wrong){
 		TextLCD_Position(lcd,20,0);
-		TextLCD_Printf(lcd,"    ");
+		TextLCD_Printf(lcd,"Wrong Pin, Try again");
+		lcd_clearRow(lcd,3);
 		tmp_presses = 0;
 	}
 
@@ -301,13 +322,14 @@ Alarm_state A_Trigged(TextLCDType *lcd){
 		return Alarm_idle;
 	}
 	else if(current_key_state == Key_Pressed){
-		TextLCD_Position(lcd,20+tmp_presses,0);
+		TextLCD_Position(lcd,20+tmp_presses,1);
 		TextLCD_Putchar(lcd,'*');
 		tmp_presses++;
 	}
 	else if(current_key_state == Key_Wrong){
 		TextLCD_Position(lcd,20,0);
-		TextLCD_Printf(lcd,"    ");
+		TextLCD_Printf(lcd,"Wrong Pin. Try Again");
+		lcd_clearRow(lcd,3);
 		tmp_presses = 0;
 	}
 	return Alarm_Trigged;
@@ -322,9 +344,8 @@ Alarm_state A_setTemp(TextLCDType *lcd, uint8_t *setTemp){
 	button = keypad_read();
 	if(button != 99){
 		if(button == 0x0A){
-
 			*setTemp = tmp_set_Temp;
-			tmp_set_Temp = 0;
+			//tmp_set_Temp = 0;
 			tmp_presses = 0;
 			lcd_clearRow(lcd,3);
 			HAL_Delay(50);
@@ -412,9 +433,9 @@ void update_lcd(TextLCDType *lcd,LCD_Status tmpS){
 		case LCD_Locked:
 			TextLCD_Clear(lcd);
 			TextLCD_Printf(lcd,"Locked");
-			TextLCD_Position(lcd,0,1);
-			TextLCD_Printf(lcd,"Enter Pin to unlock");
 			TextLCD_Position(lcd,20,0);
+			TextLCD_Printf(lcd,"Enter Pin to unlock");
+			TextLCD_Position(lcd,20,1);
 			break;
 
 
@@ -435,7 +456,7 @@ void update_lcd(TextLCDType *lcd,LCD_Status tmpS){
 		case LCD_Arming:
 			TextLCD_Clear(lcd);
 			TextLCD_Printf(lcd,"Arming:");
-			TextLCD_Position(lcd,0,1);
+			TextLCD_Position(lcd,20,0);
 			TextLCD_Printf(lcd,"Enter Pin To Unlock");
 			break;
 		case LCD_SetTemp:
@@ -459,3 +480,56 @@ void lcd_clearRow(TextLCDType *lcd,uint8_t row){
 	TextLCD_Position(lcd,x,y);
 
 }
+uint8_t check_sensors(uint8_t setTemp){
+
+	int16_t temp = Read_Analog_Temp();
+	if(!((setTemp - 2) <= temp && temp <= (setTemp +2) ))
+		return 1;
+
+	if(sensor_event == Motion_Trigged)
+		return 1;
+
+
+	return 0;
+
+
+}
+
+int16_t Read_Analog_Temp(){
+
+	uint32_t channel_0 = 0;
+	int16_t Temp = 0;
+	float Temp_1= 0, Temp_2;
+
+	float v_out = 0;
+	float T_res = 0;
+
+
+
+	HAL_ADC_Start(&hadc1);
+	if(HAL_ADC_PollForConversion(&hadc1,HAL_MAX_DELAY) == HAL_OK)
+		channel_0 = HAL_ADC_GetValue(&hadc1);
+
+
+	HAL_ADC_Stop(&hadc1);
+
+	v_out = channel_0/1241.0f;
+
+	T_res = RS*((5-v_out)/v_out);
+
+
+
+	Temp_1 = logf(T_res/RS)/3450;
+	Temp_2 = (1/298.15);
+
+	Temp = (1.0f/(Temp_1 + Temp_2)) - 273.15;
+
+
+
+	return Temp;
+
+
+
+}
+
+
