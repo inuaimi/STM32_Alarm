@@ -9,19 +9,22 @@
 #include "Keypad.h"
 #include "LCD.h"
 #include "math.h"
+#include "define.h"
+#include "ADXL345.h"
 
 /* External variables --------------------------------------------------------*/
 extern TIM_HandleTypeDef htim10;
 extern TIM_HandleTypeDef htim11;
 extern ADC_HandleTypeDef hadc1;
+extern I2C_HandleTypeDef hi2c1;
 extern volatile uint32_t usTick, sTick;
 
 sensor_status sensor_event = NONE;
 
 void init(TextLCDType *lcd);
-uint8_t compareArray(uint8_t *a, uint8_t *b,uint8_t len);
 void set_Led(Led_Color ld);
 void update_lcd(TextLCDType *lcd,LCD_Status tmpS);
+
 
 void Alarm_status(){
 
@@ -29,44 +32,43 @@ void Alarm_status(){
 	static TextLCDType lcd;
 	static uint8_t set_Temp = 26;
 
+
 	switch(current_state){
 
 		case Alarm_init:
 			init(&lcd);
 			current_state = Alarm_idle;
 			update_lcd(&lcd,LCD_Unlocked);
+			ADXL345_init_interrupt();
 			break;
 		case Alarm_idle:
 			current_state = A_idle(&lcd,set_Temp);
-			HAL_Delay(150);
 			break;
 		case ALarm_arming:
 			current_state = A_arming(&lcd);
-		  	HAL_Delay(150);
 			break;
 
 		case Alarm_armed:
 			current_state = A_armed(&lcd, set_Temp);
-		  	HAL_Delay(150);
 			break;
 
 		case Alarm_PRE_Trigged:
 			current_state = A_Pre_Trigged(&lcd);
-			HAL_Delay(150);
 			break;
 
 		case Alarm_Trigged:
 			current_state = A_Trigged(&lcd);
-			HAL_Delay(150);
 			break;
 
 		case Alarm_SetTemp:
 			current_state = A_setTemp(&lcd,&set_Temp);
-			HAL_Delay(150);
 			break;
 		case Alarm_SetGyro:
+			current_state = A_setGyro(&lcd);
 			break;
 	}
+
+	HAL_Delay(150);
 }
 
 
@@ -162,6 +164,11 @@ Alarm_state A_idle(TextLCDType *lcd,uint8_t setTemp){
 		tmp_presses = 0;
 		return Alarm_SetTemp;
 	}
+	else if(current_key_state == Key_B){
+		update_lcd(lcd,LCD_SetGyro);
+		tmp_presses = 0;
+		return Alarm_SetGyro;
+	}
 	else if(current_key_state == Key_D && tmp_presses !=0){
 		tmp_presses--;
 		TextLCD_Position(lcd,20+tmp_presses,1);
@@ -220,6 +227,7 @@ Alarm_state A_arming(TextLCDType *lcd){
 		update_lcd(lcd,LCD_Locked);
 		counter = 10;
 		sensor_event = NONE;
+		ADXL345_Clear();
 		return Alarm_armed;
 	}
 	else if(last_sTick != current_sTick){
@@ -247,6 +255,7 @@ Alarm_state A_armed(TextLCDType *lcd,uint8_t setTemp){
 
 	if(sensorStatus){
 		update_lcd(lcd,LCD_PRI_Trigged);
+		tmp_presses = 0;
 		return Alarm_PRE_Trigged;
 	}
 
@@ -391,7 +400,7 @@ Alarm_state A_setTemp(TextLCDType *lcd, uint8_t *setTemp){
 			set_Led(L_GREEN);
 			TextLCD_Clear(lcd);
 			update_lcd(lcd,LCD_Unlocked);
-			*setTemp = tmp_set_Temp;
+			//*setTemp = tmp_set_Temp;
 			tmp_set_Temp = 0;
 			tmp_presses = 0;
 			return Alarm_idle;
@@ -421,7 +430,54 @@ Alarm_state A_setTemp(TextLCDType *lcd, uint8_t *setTemp){
 	return Alarm_SetTemp;
 
 }
+Alarm_state A_setGyro(TextLCDType *lcd){
 
+	uint8_t button;
+	static uint8_t tmp_set_Gyro = 0;
+	static uint8_t set_Gyro = 75;
+	static uint8_t tmp_presses = 0;
+	button = keypad_read();
+	if(button != 99){
+		if(button == 0x0A){
+			//tmp_set_Temp = 0;
+			tmp_presses = 0;
+			lcd_clearRow(lcd,3);
+			set_Gyro = tmp_set_Gyro;
+			ADXL345_setThreshold(set_Gyro);
+			HAL_Delay(50);
+		}
+		else if(button == 0x0B){
+			set_Led(L_GREEN);
+			TextLCD_Clear(lcd);
+			update_lcd(lcd,LCD_Unlocked);
+			tmp_presses = 0;
+			return Alarm_idle;
+
+		}
+		else{ //if(button <= 0x00 && 0x09 <= button){
+
+			tmp_set_Gyro *= 10;
+			tmp_set_Gyro += button;
+
+			TextLCD_Position(lcd,20,1);
+			TextLCD_Printf(lcd,"%d ",tmp_set_Gyro);
+			tmp_presses++;
+
+		}
+	}
+	if(tmp_presses == 4 || 255 < tmp_set_Gyro){
+		tmp_set_Gyro = 0;
+		tmp_presses = 0;
+		lcd_clearRow(lcd,3);
+	}
+
+	lcd_clearRow(lcd,1);
+	TextLCD_Printf(lcd,"Set Gyro:%d", set_Gyro);
+	return Alarm_SetGyro;
+
+
+
+}
 void set_Led(Led_Color ld){
 
 	switch(ld){
@@ -460,7 +516,7 @@ void update_lcd(TextLCDType *lcd,LCD_Status tmpS){
 			TextLCD_Clear(lcd);
 			TextLCD_Printf(lcd,"A - Temp ");
 			//TextLCD_Position(lcd,0,1);
-			TextLCD_Printf(lcd," B - Gyro");
+			TextLCD_Printf(lcd," B - ADXL");
 			TextLCD_Position(lcd,20,0);
 			TextLCD_Printf(lcd,"Enter Pin to lock");
 			TextLCD_Position(lcd,20,1);
@@ -501,6 +557,12 @@ void update_lcd(TextLCDType *lcd,LCD_Status tmpS){
 			TextLCD_Position(lcd,20,0);
 			TextLCD_Printf(lcd,"Enter A New Temp");
 			break;
+		case LCD_SetGyro:
+			TextLCD_Clear(lcd);
+			TextLCD_Printf(lcd,"A - SET  B - Return");
+			TextLCD_Position(lcd,20,0);
+			TextLCD_Printf(lcd,"Enter A Value 0-255");
+			break;
 	}
 }
 
@@ -524,9 +586,11 @@ uint8_t check_sensors(uint8_t setTemp){
 	if(!((setTemp - 2) <= temp && temp <= (setTemp +2) ))
 		return 1;
 
-	if(sensor_event == Motion_Trigged)
+	if(sensor_event == Motion_Trigged){
+		sensor_event = NONE;
+		ADXL345_Clear();
 		return 1;
-
+	}
 
 	return 0;
 
@@ -567,5 +631,4 @@ int16_t Read_Analog_Temp(){
 
 
 }
-
 

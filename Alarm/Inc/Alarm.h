@@ -21,7 +21,7 @@ typedef enum{NONE, Motion_Trigged,Sound_Trigged,Diamond_Trigged} sensor_status;
 
 typedef enum{L_OFF, L_RED,L_YELLOW,L_GREEN} Led_Color;
 
-typedef enum{LCD_NONE, LCD_Unlocked, LCD_Locked,LCD_Arming,LCD_PRI_Trigged,LCD_Trigged, LCD_SetTemp} LCD_Status;
+typedef enum{LCD_NONE, LCD_Unlocked, LCD_Locked,LCD_Arming,LCD_PRI_Trigged,LCD_Trigged, LCD_SetTemp, LCD_SetGyro} LCD_Status;
 
 
 void Alarm_status();
@@ -33,13 +33,17 @@ Alarm_state A_Pre_Trigged(TextLCDType *lcd);
 Alarm_state A_Trigged(TextLCDType *lcd);
 
 Alarm_state A_setTemp(TextLCDType *lcd, uint8_t *setTemp);
-
+Alarm_state A_setGyro(TextLCDType *lcd);
 key_code Alarm_code_status(const uint8_t *code);
 
 void lcd_clearRow(TextLCDType *lcd,uint8_t row);
 uint8_t check_sensors(uint8_t setTemp);
 
 int16_t Read_Analog_Temp();
+
+
+
+
 
 
 
