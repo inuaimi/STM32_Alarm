@@ -164,9 +164,21 @@ void TextLCD_Printf(TextLCDType *lcd, char *message, ...){
 
 
 }
+void TextLCD_TempSymbol(TextLCDType *lcd){
+	uint8_t i = 0;
+	uint8_t b[7]={0x10,0x10,0x16,0x19,0x11,0x11,0x1E};
+
+	TextLCD_Cmd(lcd,0x00);
+
+	while(i != 7){
+		TextLCD_Data(lcd,b[i]);
+		i++;
+	}
+	TextLCD_Cmd(lcd,0x00);
+}
 
 
-//Private:
+//Private
 void TextLCD_Strobe(TextLCDType *lcd){
 
 

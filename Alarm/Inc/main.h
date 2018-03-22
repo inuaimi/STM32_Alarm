@@ -93,8 +93,8 @@
 #define PAD_COLUM_3_GPIO_Port GPIOA
 #define PAD_COLUM_4_Pin GPIO_PIN_9
 #define PAD_COLUM_4_GPIO_Port GPIOA
-#define LED_YELLOW_Pin GPIO_PIN_10
-#define LED_YELLOW_GPIO_Port GPIOA
+#define LED_BLUE_Pin GPIO_PIN_10
+#define LED_BLUE_GPIO_Port GPIOA
 #define TMS_Pin GPIO_PIN_13
 #define TMS_GPIO_Port GPIOA
 #define TCK_Pin GPIO_PIN_14

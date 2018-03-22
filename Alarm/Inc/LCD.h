@@ -34,7 +34,9 @@ void TextLCD_PutsLen(TextLCDType *lcd, uint8_t *string, uint8_t len);
 void TextLCD_Printf(TextLCDType *lcd, char *message, ...);
 
 
-//Private:
+void TextLCD_TempSymbol(TextLCDType *lcd);
+
+//Private
 
 
 
