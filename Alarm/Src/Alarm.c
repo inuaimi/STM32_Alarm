@@ -11,19 +11,24 @@
 #include "math.h"
 #include "define.h"
 #include "ADXL345.h"
+#include "Delay.h"
 
 /* External variables --------------------------------------------------------*/
+extern TIM_HandleTypeDef htim2;
+extern TIM_HandleTypeDef htim9;
 extern TIM_HandleTypeDef htim10;
 extern TIM_HandleTypeDef htim11;
+
 extern ADC_HandleTypeDef hadc1;
 extern I2C_HandleTypeDef hi2c1;
-extern volatile uint32_t usTick, sTick;
+extern UART_HandleTypeDef huart2;
+
+
+extern volatile uint32_t usTick, sTick,msTick;
 
 sensor_status sensor_event = NONE;
 
-void init(TextLCDType *lcd);
-void set_Led(Led_Color ld);
-void update_lcd(TextLCDType *lcd,LCD_Status tmpS);
+
 
 
 void Alarm_status(){
@@ -32,6 +37,8 @@ void Alarm_status(){
 	static TextLCDType lcd;
 	static uint8_t set_Temp = 26;
 	static uint8_t tmpCode[4] = {7,3,9,2};
+	uint8_t tmp_state = 0;
+
 
 
 	switch(current_state){
@@ -41,20 +48,25 @@ void Alarm_status(){
 			current_state = Alarm_idle;
 			update_lcd(&lcd,LCD_Unlocked);
 			ADXL345_init_interrupt();
+			tmp_state = 0;
 			break;
 		case Alarm_idle:
 			current_state = A_idle(&lcd,set_Temp, tmpCode);
+			tmp_state = 0;
 			break;
 		case ALarm_arming:
 			current_state = A_arming(&lcd,tmpCode);
+			tmp_state = 1;
 			break;
 
 		case Alarm_armed:
 			current_state = A_armed(&lcd, set_Temp,tmpCode);
+			tmp_state = 2;
 			break;
 
 		case Alarm_PRE_Trigged:
 			current_state = A_Pre_Trigged(&lcd,tmpCode);
+			tmp_state = 3;
 			break;
 
 		case Alarm_Trigged:
@@ -64,15 +76,21 @@ void Alarm_status(){
 		case Alarm_SetTemp:
 			current_state = A_setTemp(&lcd,&set_Temp);
 			break;
+
 		case Alarm_SetGyro:
 			current_state = A_setGyro(&lcd);
 			break;
+
 		case Alarm_setCode:
 			current_state = A_setCode(&lcd,tmpCode);
 			break;
 	}
 
-	HAL_Delay(150);
+	update_uart(tmp_state,set_Temp);
+
+	delay_ms(150);
+
+
 }
 
 
@@ -81,6 +99,10 @@ void init(TextLCDType *lcd){
 
 	HAL_TIM_Base_Start_IT(&htim10);
 	HAL_TIM_Base_Start_IT(&htim11);
+	HAL_TIM_Base_Start_IT(&htim9);
+
+	HAL_TIM_Base_Start(&htim2);
+	HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_1);
 
 	TextLCD_Init(lcd,LCD_E_GPIO_Port, LCD_RS_Pin,LCD_RW_Pin, LCD_E_Pin ,LCD_D0_GPIO_Port ,
 		  (LCD_D0_Pin | LCD_D1_Pin | LCD_D2_Pin | LCD_D3_Pin | LCD_D4_Pin | LCD_D5_Pin
@@ -127,48 +149,7 @@ key_code Alarm_code_status(const uint8_t *code){
 	return Key_No_Pressed;
 
 }
-key_code Alarm_code_status_2(uint16_t code){
 
-	static uint8_t clicks = 0;
-	static uint16_t clicked_number = 0;
-	uint8_t button;
-
-	button = keypad_read();
-	if(button !=99){
-		if(button == 0x0A && clicks==0){
-			return Key_A;
-		}
-		else if(button == 0x0B && clicks==0){
-			return Key_B;
-		}
-		else if(button == 0x0D && clicks !=0){
-			clicks--;
-			return Key_D;
-		}
-		else if(button <= 0x09){
-			clicked_number *=10;
-			clicked_number += button;
-			clicks++;
-			if(clicks==4){
-				clicks=0;
-
-				 if(clicked_number == code){
-					 clicked_number = 0;
-					 return Key_OK;
-				 }
-				 else{
-					 clicked_number = 0;
-					 return Key_Wrong;
-				 }
-
-			  }
-			return Key_Pressed;
-		}
-	 }
-
-	return Key_No_Pressed;
-
-}
 
 
 
@@ -179,10 +160,6 @@ Alarm_state A_idle(TextLCDType *lcd,uint8_t setTemp, uint8_t *code){
 	static uint8_t tmp_presses = 0;
 
 
-
-
-
-
 	currentTemp = Read_Analog_Temp();
 	current_key_state = Alarm_code_status(code);
 	if(current_key_state == Key_OK){
@@ -190,12 +167,10 @@ Alarm_state A_idle(TextLCDType *lcd,uint8_t setTemp, uint8_t *code){
 		update_lcd(lcd,LCD_Arming);
 		tmp_presses = 0;
 		return ALarm_arming;
-
 	}
 	else if(current_key_state == Key_Pressed){
 		TextLCD_Position(lcd,20+tmp_presses,1);
 		TextLCD_Putchar(lcd,'*');
-		//TextLCD_TempSymbol(lcd);
 		tmp_presses ++;
 
 	}
@@ -252,6 +227,7 @@ Alarm_state A_arming(TextLCDType *lcd,uint8_t *code){
 		update_lcd(lcd,LCD_Unlocked);
 		tmp_presses = 0;
 		counter = 10;
+		HAL_GPIO_WritePin(ACTIVE_BUZZER_GPIO_Port,ACTIVE_BUZZER_Pin, GPIO_PIN_RESET);
 		return Alarm_idle;
 		}
 	else if(current_key_state == Key_Pressed){
@@ -279,6 +255,7 @@ Alarm_state A_arming(TextLCDType *lcd,uint8_t *code){
 		counter = 10;
 		sensor_event = NONE;
 		ADXL345_Clear();
+		HAL_GPIO_WritePin(ACTIVE_BUZZER_GPIO_Port,ACTIVE_BUZZER_Pin, GPIO_PIN_RESET);
 		return Alarm_armed;
 	}
 	else if(last_sTick != current_sTick){
@@ -287,6 +264,9 @@ Alarm_state A_arming(TextLCDType *lcd,uint8_t *code){
 		counter--;
 		last_sTick = current_sTick;
 	}
+
+	HAL_GPIO_TogglePin(ACTIVE_BUZZER_GPIO_Port,ACTIVE_BUZZER_Pin);
+
 
 	return ALarm_arming;
 
@@ -361,6 +341,7 @@ Alarm_state A_Pre_Trigged(TextLCDType *lcd,uint8_t *code){
 		update_lcd(lcd,LCD_Unlocked);
 		counter = 30;
 		tmp_presses = 0;
+		HAL_GPIO_WritePin(ACTIVE_BUZZER_GPIO_Port,ACTIVE_BUZZER_Pin, GPIO_PIN_RESET);
 		return Alarm_idle;
 		}
 	else if(current_key_state == Key_Pressed){
@@ -386,6 +367,7 @@ Alarm_state A_Pre_Trigged(TextLCDType *lcd,uint8_t *code){
 		TextLCD_Clear(lcd);
 		update_lcd(lcd,LCD_Trigged);
 		counter = 30;
+		tmp_presses = 0;
 		sensor_event = NONE;
 		return Alarm_Trigged;
 	}
@@ -394,6 +376,7 @@ Alarm_state A_Pre_Trigged(TextLCDType *lcd,uint8_t *code){
 		TextLCD_Printf(lcd,"Enter Pin In:%d ", counter);
 		counter--;
 		last_sTick = sTick;
+		HAL_GPIO_TogglePin(ACTIVE_BUZZER_GPIO_Port,ACTIVE_BUZZER_Pin);
 	}
 
 	return Alarm_PRE_Trigged;
@@ -410,6 +393,7 @@ Alarm_state A_Trigged(TextLCDType *lcd){
 	if(current_key_state == Key_OK){
 		set_Led(L_GREEN);
 		update_lcd(lcd,LCD_Unlocked);
+		__HAL_TIM_SET_COMPARE(&htim2,TIM_CHANNEL_1,0);
 		return Alarm_idle;
 	}
 	else if(current_key_state == Key_Pressed){
@@ -428,6 +412,7 @@ Alarm_state A_Trigged(TextLCDType *lcd){
 		TextLCD_Position(lcd,20+tmp_presses,1);
 		TextLCD_Putchar(lcd, ' ');
 	}
+	toggle_Passive_buzzer();
 	return Alarm_Trigged;
 
 }
@@ -708,6 +693,29 @@ uint8_t check_sensors(uint8_t setTemp){
 
 
 }
+void toggle_Passive_buzzer(){
+
+
+	static uint8_t tmp = 0;
+
+	switch(tmp){
+
+	case 0:
+		 __HAL_TIM_SET_COMPARE(&htim2,TIM_CHANNEL_1,50000);
+		break;
+	case 1:
+		__HAL_TIM_SET_COMPARE(&htim2,TIM_CHANNEL_1,200000);
+		break;
+	case 2:
+		__HAL_TIM_SET_COMPARE(&htim2,TIM_CHANNEL_1,2000);
+		break;
+	}
+	tmp++;
+
+	if (3 <= tmp)
+		tmp=0;
+
+}
 
 int16_t Read_Analog_Temp(){
 
@@ -739,6 +747,33 @@ int16_t Read_Analog_Temp(){
 	Temp = (1.0f/(Temp_1 + Temp_2)) - 273.15;
 
 	return Temp;
+
+
+
+}
+
+void update_uart(uint8_t state, uint8_t setTemp){
+
+
+	int16_t temp = Read_Analog_Temp();
+
+	uint8_t txt[20];
+
+	uint8_t len = 0;
+
+	len = sprintf(txt, "[A%02d]",state);
+	HAL_UART_Transmit(&huart2,txt,len,100);
+	HAL_Delay(1);
+
+
+	len = sprintf(txt, "[T%02d]",temp);
+	HAL_UART_Transmit(&huart2,txt,len,100);
+	HAL_Delay(1);
+
+
+	len = sprintf(txt, "[S%02d]",setTemp);
+	HAL_UART_Transmit(&huart2,txt,len,100);
+	HAL_Delay(1);
 
 
 

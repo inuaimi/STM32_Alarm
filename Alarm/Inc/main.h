@@ -83,6 +83,8 @@
 #define LCD_RW_GPIO_Port GPIOB
 #define LCD_E_Pin GPIO_PIN_2
 #define LCD_E_GPIO_Port GPIOB
+#define ACTIVE_BUZZER_Pin GPIO_PIN_13
+#define ACTIVE_BUZZER_GPIO_Port GPIOB
 #define LCD_D6_Pin GPIO_PIN_6
 #define LCD_D6_GPIO_Port GPIOC
 #define LCD_D7_Pin GPIO_PIN_7
