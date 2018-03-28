@@ -30,12 +30,11 @@ sensor_status sensor_event = NONE;
 
 
 
-
 void Alarm_status(){
 
 	static Alarm_state current_state = Alarm_init;
 	static TextLCDType lcd;
-	static uint8_t set_Temp = 26;
+	static uint8_t set_Temp = 0;
 	static uint8_t tmpCode[4] = {7,3,9,2};
 	uint8_t tmp_state = 0;
 
@@ -49,6 +48,7 @@ void Alarm_status(){
 			update_lcd(&lcd,LCD_Unlocked);
 			ADXL345_init_interrupt();
 			tmp_state = 0;
+			set_Temp = Read_Analog_Temp();
 			break;
 		case Alarm_idle:
 			current_state = A_idle(&lcd,set_Temp, tmpCode);
@@ -80,7 +80,9 @@ void Alarm_status(){
 		case Alarm_SetGyro:
 			current_state = A_setGyro(&lcd);
 			break;
-
+		case Alarm_Pre_setCode:
+			current_state = A_Pre_setCode(&lcd,tmpCode);
+			break;
 		case Alarm_setCode:
 			current_state = A_setCode(&lcd,tmpCode);
 			break;
@@ -118,8 +120,13 @@ key_code Alarm_code_status(const uint8_t *code){
 	static uint8_t clicked_button[4];
 	uint8_t button;
 
+	//uint8_t txt[10];
+	//uint8_t len;
+
 	button = keypad_read();
 	if(button !=99){
+		//len = sprintf(txt,"%d\n\r",button);
+		//HAL_UART_Transmit(&huart2,txt,len,100);
 		if(button == 0x0A && clicks==0)
 			return Key_A;
 		else if(button == 0x0B && clicks==0)
@@ -192,9 +199,9 @@ Alarm_state A_idle(TextLCDType *lcd,uint8_t setTemp, uint8_t *code){
 		return Alarm_SetGyro;
 	}
 	else if(current_key_state == Key_C){
-		update_lcd(lcd,LCD_SetCode);
+		update_lcd(lcd,LCD_Pre_setCode);
 		tmp_presses = 0;
-		return Alarm_setCode;
+		return Alarm_Pre_setCode;
 	}
 	else if(current_key_state == Key_D && tmp_presses !=0){
 		tmp_presses--;
@@ -280,16 +287,32 @@ Alarm_state A_armed(TextLCDType *lcd,uint8_t setTemp,uint8_t *code){
 	key_code current_key_state;
 	uint8_t sensorStatus;
 	static uint8_t tmp_presses = 0;
-
-	sensorStatus = check_sensors(setTemp);
-
-	if(sensorStatus){
-		update_lcd(lcd,LCD_PRI_Trigged);
-		tmp_presses = 0;
-		return Alarm_PRE_Trigged;
-	}
+	int16_t temp = Read_Analog_Temp();
 
 	current_key_state = Alarm_code_status(code);
+
+
+	if(!((setTemp - 2) <= temp && temp <= (setTemp +2) )){
+		update_lcd(lcd,LCD_Trigged);
+		tmp_presses = 0;
+		return Alarm_Trigged;
+	}
+
+
+	if (sensor_event == Motion_Trigged){
+		sensor_event = NONE;
+		tmp_presses = 0;
+		update_lcd(lcd,LCD_PRI_Trigged);
+		return Alarm_PRE_Trigged;
+	}
+	else if(sensor_event == Diamond_Trigged){
+		sensor_event = NONE;
+		tmp_presses = 0;
+		ADXL345_Clear();
+		update_lcd(lcd,LCD_Trigged);
+		return Alarm_Trigged;
+	}
+
 
 
 	if(current_key_state == Key_OK){
@@ -317,6 +340,8 @@ Alarm_state A_armed(TextLCDType *lcd,uint8_t setTemp,uint8_t *code){
 		TextLCD_Putchar(lcd,' ');
 	}
 
+
+
 	return Alarm_armed;
 
 
@@ -326,7 +351,7 @@ Alarm_state A_armed(TextLCDType *lcd,uint8_t setTemp,uint8_t *code){
 Alarm_state A_Pre_Trigged(TextLCDType *lcd,uint8_t *code){
 
 
-	static uint8_t counter = 30;
+	static uint8_t counter = 10;
 	static uint32_t last_sTick = 0;
 	key_code current_key_state;
 
@@ -339,7 +364,7 @@ Alarm_state A_Pre_Trigged(TextLCDType *lcd,uint8_t *code){
 	if(current_key_state == Key_OK){
 		set_Led(L_GREEN);
 		update_lcd(lcd,LCD_Unlocked);
-		counter = 30;
+		counter = 10;
 		tmp_presses = 0;
 		HAL_GPIO_WritePin(ACTIVE_BUZZER_GPIO_Port,ACTIVE_BUZZER_Pin, GPIO_PIN_RESET);
 		return Alarm_idle;
@@ -394,6 +419,7 @@ Alarm_state A_Trigged(TextLCDType *lcd){
 		set_Led(L_GREEN);
 		update_lcd(lcd,LCD_Unlocked);
 		__HAL_TIM_SET_COMPARE(&htim2,TIM_CHANNEL_1,0);
+		tmp_presses = 0;
 		return Alarm_idle;
 	}
 	else if(current_key_state == Key_Pressed){
@@ -413,6 +439,8 @@ Alarm_state A_Trigged(TextLCDType *lcd){
 		TextLCD_Putchar(lcd, ' ');
 	}
 	toggle_Passive_buzzer();
+
+
 	return Alarm_Trigged;
 
 }
@@ -475,11 +503,11 @@ Alarm_state A_setGyro(TextLCDType *lcd){
 	button = keypad_read();
 	if(button != 99){
 		if(button == 0x0A){
-			//tmp_set_Temp = 0;
 			tmp_presses = 0;
 			lcd_clearRow(lcd,3);
 			set_Gyro = tmp_set_Gyro;
 			ADXL345_setThreshold(set_Gyro);
+			tmp_set_Gyro = 0;
 			HAL_Delay(50);
 		}
 		else if(button == 0x0B){
@@ -487,6 +515,7 @@ Alarm_state A_setGyro(TextLCDType *lcd){
 			TextLCD_Clear(lcd);
 			update_lcd(lcd,LCD_Unlocked);
 			tmp_presses = 0;
+			tmp_set_Gyro = 0;
 			return Alarm_idle;
 
 		}
@@ -514,6 +543,48 @@ Alarm_state A_setGyro(TextLCDType *lcd){
 
 
 }
+Alarm_state A_Pre_setCode(TextLCDType *lcd,uint8_t *code){
+
+	key_code current_key_state;
+	static uint8_t tmp_presses = 0;
+
+
+	current_key_state = Alarm_code_status(code);
+	if(current_key_state == Key_OK){
+		update_lcd(lcd,LCD_SetCode);
+		tmp_presses = 0;
+		return Alarm_setCode;
+	}
+	else if(current_key_state == Key_Pressed){
+		TextLCD_Position(lcd,20+tmp_presses,1);
+		TextLCD_Putchar(lcd,'*');
+		tmp_presses ++;
+
+	}
+	else if(current_key_state == Key_Wrong){
+		lcd_clearRow(lcd,2);
+		TextLCD_Printf(lcd,"Wrong Pin,Try Again");
+		lcd_clearRow(lcd,3);
+		tmp_presses = 0;
+	}
+
+	else if(current_key_state == Key_A){
+		update_lcd(lcd,LCD_Unlocked);
+		tmp_presses = 0;
+		return Alarm_idle;
+	}
+	else if(current_key_state == Key_D && tmp_presses !=0){
+		tmp_presses--;
+		TextLCD_Position(lcd,20+tmp_presses,1);
+		TextLCD_Putchar(lcd,' ');
+		TextLCD_Position(lcd,20+tmp_presses,1);
+	}
+
+	return Alarm_Pre_setCode;
+
+
+}
+
 Alarm_state A_setCode(TextLCDType *lcd,uint8_t *setCode){
 
 	uint8_t button;
@@ -653,6 +724,13 @@ void update_lcd(TextLCDType *lcd,LCD_Status tmpS){
 			TextLCD_Printf(lcd,"A - SET  B - Return");
 			TextLCD_Position(lcd,20,0);
 			TextLCD_Printf(lcd,"Enter A Value 0-255");
+			break;
+		case LCD_Pre_setCode:
+			TextLCD_Clear(lcd);
+			TextLCD_Printf(lcd,"A-Return");
+			TextLCD_Position(lcd,20,0);
+			TextLCD_Printf(lcd,"Enter Current Pin:");
+			TextLCD_Position(lcd,20,1);
 			break;
 		case LCD_SetCode:
 			TextLCD_Clear(lcd);

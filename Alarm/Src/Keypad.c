@@ -12,7 +12,6 @@ void keypad_SetColumn(uint8_t column);
 uint8_t keypad_CheckRow(uint8_t column);
 
 
-
 uint8_t KEYPAD_Buttons[4][4] = {
 		{0x01, 0x02, 0x03, 0x0A},
 		{0x04, 0x05, 0x06, 0x0B},
@@ -35,6 +34,8 @@ int8_t keypad_read(){
 
 	uint8_t button;
 	static uint8_t keypressed = 0;
+
+
 
 	keypad_SetColumn(1);
 	button = keypad_CheckRow(1);

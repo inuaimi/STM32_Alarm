@@ -41,6 +41,7 @@ uint32_t sTick=0;
 uint32_t usTick=0;
 uint32_t msTick=0;
 
+
 extern volatile sensor_status sensor_event;
 /* USER CODE END 0 */
 
@@ -108,7 +109,7 @@ void EXTI2_IRQHandler(void)
 {
   /* USER CODE BEGIN EXTI2_IRQn 0 */
 	if(sensor_event == NONE)
-		sensor_event = Motion_Trigged;
+		sensor_event = Diamond_Trigged;
 
   /* USER CODE END EXTI2_IRQn 0 */
   HAL_GPIO_EXTI_IRQHandler(GPIO_PIN_2);
@@ -140,7 +141,7 @@ void EXTI9_5_IRQHandler(void)
 {
   /* USER CODE BEGIN EXTI9_5_IRQn 0 */
 	if(sensor_event == NONE)
-		sensor_event = Motion_Trigged;
+		sensor_event = Diamond_Trigged;
   /* USER CODE END EXTI9_5_IRQn 0 */
   HAL_GPIO_EXTI_IRQHandler(GPIO_PIN_5);
   /* USER CODE BEGIN EXTI9_5_IRQn 1 */

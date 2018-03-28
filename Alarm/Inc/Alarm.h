@@ -13,7 +13,7 @@
 #define RS 10000.0f
 
 typedef enum{Alarm_init, Alarm_idle, ALarm_arming,
-	Alarm_armed,Alarm_PRE_Trigged,Alarm_Trigged, Alarm_SetTemp,Alarm_SetGyro, Alarm_setCode} Alarm_state;
+	Alarm_armed,Alarm_PRE_Trigged,Alarm_Trigged, Alarm_SetTemp,Alarm_SetGyro,Alarm_Pre_setCode, Alarm_setCode} Alarm_state;
 
 typedef enum{Key_No_Pressed, Key_Pressed, Key_OK,Key_Wrong, Key_A, Key_B, Key_C, Key_D} key_code;
 
@@ -21,7 +21,7 @@ typedef enum{NONE, Motion_Trigged, Sound_Trigged, Diamond_Trigged} sensor_status
 
 typedef enum{L_OFF, L_RED,L_YELLOW,L_GREEN} Led_Color;
 
-typedef enum{LCD_NONE, LCD_Unlocked, LCD_Locked, LCD_Arming, LCD_PRI_Trigged, LCD_Trigged, LCD_SetTemp, LCD_SetGyro, LCD_SetCode} LCD_Status;
+typedef enum{LCD_NONE, LCD_Unlocked, LCD_Locked, LCD_Arming, LCD_PRI_Trigged, LCD_Trigged, LCD_SetTemp, LCD_SetGyro, LCD_Pre_setCode, LCD_SetCode} LCD_Status;
 
 
 void Alarm_status();
@@ -37,6 +37,9 @@ Alarm_state A_Trigged(TextLCDType *lcd);
 
 Alarm_state A_setTemp(TextLCDType *lcd, uint8_t *setTemp);
 Alarm_state A_setGyro(TextLCDType *lcd);
+
+Alarm_state A_Pre_setCode(TextLCDType *lcd,uint8_t *code);
+
 Alarm_state A_setCode(TextLCDType *lcd,uint8_t *setCode);
 
 
