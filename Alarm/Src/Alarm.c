@@ -678,7 +678,8 @@ void update_lcd(TextLCDType *lcd,LCD_Status tmpS){
 			break;
 		case LCD_Unlocked:
 			TextLCD_Clear(lcd);
-			TextLCD_Printf(lcd,"A-TEMP B-ADXL C-Code");
+			//TextLCD_Printf(lcd,"A-TEMP B-ADXL C-Code");
+			TextLCD_Printf(lcd,"idag 2018 03 31");
 			TextLCD_Position(lcd,20,0);
 			TextLCD_Printf(lcd,"Enter Pin to lock");
 			TextLCD_Position(lcd,20,1);
